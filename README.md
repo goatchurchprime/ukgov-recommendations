@@ -19,3 +19,8 @@ Quality assurance by issue tracking inspired by [Francis's Github House](http://
     * re-open an issue if is is deemed not to have actually been fixed
     
 7.  Currently this workflow exists in an approximate form through grab-bag government responses to committee reports, like: [Cm 8697](https://www.gov.uk/government/uploads/system/uploads/attachment_data/file/239115/32914_Cm_8697_v0.2.pdf) "_Government responses on the First, the Third to the Fifth, the Seventh to the Twelfth, and the Fifteenth and Sixteenth Reports from the Committee of Public Accounts. Session 2013-14._"
+
+
+
+ 
+NB this was hacked at the [ACCHACK14](http://hacks.rewiredstate.org/events/acchack14) and requires [twistcodewiki](https://bitbucket.org/goatchurch/twistcodewiki) to load PDFs and javascript through localhost:9003.  There are more standard ways to do this.
