@@ -1,0 +1,181 @@
+<html>
+<head>
+<style>
+</style>
+<script src="/js/jquery-1.5.2.js"></script>
+<script src="/js/json-min.js"></script>
+<script src="/js/pdfjs/pdf.js"></script>
+<script src="/js/jquery.Jcrop.js"></script>
+<link rel="stylesheet" href="/css/jquery.Jcrop.css" type="text/css" />
+<style>
+    
+.dpdfpagediv { border: thin black solid; display: inline-block }
+.rhpanel {float: right; padding-left: auto }
+.roving { position: absolute; left: 0px; top: 0px; background-color: yellow }
+
+</style>
+<script>
+
+
+var urlParams = {};    
+var fpdf = null; 
+var npage = 0; 
+var pdfobj = null; 
+var pageobj = null; 
+var textcontentobj = null; 
+var pdfscale = 1.5; 
+var pagehref = ""; 
+var jcropperapi = null; 
+var setcropv = null; 
+
+
+
+// these conversions from the transform matrix in the textcontentobj item to the cropping coordinates have been found experimentally (note that y is upside down)
+// 113.46, 746.46 -> 169,  129
+// 458.46, 94.92  -> 686, 1109
+function convx(x) { return (x - 113.46) / (458.46 - 113.46) * (686 - 169) + 169; }
+function convy(y) { return (y - 746.46) / (94.92 - 746.46) * (1109 - 129) + 129; }
+
+function setCrop(c)
+{
+    setcropv = c; 
+    var width = $('#the-canvas').attr('width'); 
+    var height = $('#the-canvas').attr('height'); 
+    ix1 = Math.ceil(c.x * 1000 / width);
+    iy1 = Math.ceil(c.y * 1000 / width);
+    ix2 = Math.ceil(c.x2 * 1000 / width); 
+    iy2 = Math.ceil(c.y2 * 1000 / width);
+    var dlk = ix1 + "," + iy1 + "_" + ix2 + "," + iy2; 
+    $('#rectlink').attr("href", pagehref+"&rect="+dlk); 
+    $('#rectlink').text("rect_"+dlk); 
+};
+
+function pdfpagefunc(page) 
+{
+    pageobj = page; 
+    $("#pdfpage").text(pageobj.pageNumber); 
+    console.log("We have got page: " + page); 
+    var viewport = page.getViewport(pdfscale);
+    var canvas = document.getElementById('the-canvas');
+    var context = canvas.getContext('2d');
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    var renderContext = {
+        canvasContext: context,
+        viewport: viewport 
+    };
+    page.render(renderContext).then(function(){
+        var cropparams = { onSelect: setCrop, onChange: setCrop, keySupport: false }; 
+        var selb = (/(\d+),(\d+)_(\d+),(\d+)/g).exec(urlParams.rect != undefined ? urlParams.rect : ""); 
+        if (selb != null) {
+            var width = $('#the-canvas').attr('width'); 
+            cropparams["setSelect"] = [parseInt(selb[1])*width/1000, parseInt(selb[2])*width/1000, parseInt(selb[3])*width/1000, parseInt(selb[4])*width/1000]; 
+        }
+        $('#the-canvas').Jcrop(cropparams, function() { jcropperapi = this; }); 
+    }); 
+    
+    page.getTextContent().then(function(textContent) {
+        textcontentobj = textContent; 
+    });     
+}
+
+function pdfmakepagefunc(lnpage) {
+    npage = lnpage; 
+    pdfobj.getPage(npage).then(pdfpagefunc); 
+    if (npage > 1)
+        $("#prevpage").show().attr("href", "?f="+encodeURIComponent(urlParams.f)+"&p="+encodeURIComponent(npage-1)); 
+    else
+        $("#prevpage").hide(); 
+    if (npage < pdfobj.numPages)
+        $("#nextpage").show().attr("href", "?f="+encodeURIComponent(urlParams.f)+"&p="+encodeURIComponent(npage+1)); 
+    else
+        $("#nextpage").hide(); 
+    pagehref = "?f="+encodeURIComponent(urlParams.f)+"&p="+encodeURIComponent(npage); 
+}
+        
+function pdfdocumentfunc(lfpdf, lnpage)
+{
+    if (fpdf == lfpdf) 
+        return pdfmakepagefunc(lnpage); 
+    fpdf = lfpdf; 
+    
+    $("#loading").show(); 
+    $("#pdfurl").text(fpdf); 
+
+    fpdf = lfpdf; 
+    PDFJS.getDocument(lfpdf).then(function(lpdf) {
+        pdfobj = lpdf; 
+        $("#loading").hide(); 
+        $("#pdfnpages").text(pdfobj.numPages); 
+        pdfmakepagefunc(lnpage); 
+    });
+}
+
+$(window).ready(function()
+{
+    $("#loading").hide(); 
+
+    var match, pl=/\+/g, search=/([^&=]+)=?([^&]*)/g; 
+    var decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); }; 
+    var query = window.location.search.substring(1);
+    while (match = search.exec(query))
+        urlParams[decode(match[1])] = decode(match[2]);
+        
+    pdfdocumentfunc((urlParams.f == undefined ? '/pdf/SN06894.pdf' : '/pdf/'+urlParams.f+'.pdf'), (urlParams.p == undefined ? 1 : parseInt(urlParams.p))); 
+    
+    $("#loadissues").click(function() {
+        $("ul#issueslist").clear(); 
+        $.ajax({ url: 'https://api.github.com/repos/goatchurchprime/ukgov-recommendations/issues', dataType: 'jsonp', success: function(data) {
+            console.log(data); 
+        }}); 
+    });
+    
+    $("#extracttext").click(function() { 
+        var i = parseInt($("#extracttexti").val()); 
+        var item = textcontentobj.items[i]; 
+        console.log(item); 
+        var trm = item.transform;  // [a b c d tx ty]
+        var height = 1000; //$('#the-canvas').attr('height'); 
+        var cx = convx(trm[4]); 
+        var cy = convy(trm[5]); 
+        var cx1 = convx(trm[4] + item.width); 
+        var cy1 = convy(trm[5] - item.height); 
+        jcropperapi.animateTo([cx, cy, cx1, cy1]); 
+        //$(".roving").css("top", cy).css("left", cx).text(item.str+"#"); 
+    }); 
+}); 
+
+
+</script>
+
+</head>
+
+<body>
+<h2>PDF thing: 
+    <span id="loading">[loading]</span> 
+    <span id="pdfurl">...</span>
+    page:
+    <span id="pdfpage"></span>
+    of 
+    <span id="pdfnpages"></span>
+    <a href="" id="prevpage">&lt;&lt;</a>
+    <a href="" id="nextpage">&gt;&gt;</a>
+    <a href="" id="rectlink"></a>
+</h2>
+
+<div class="pdfpagediv">
+    <div style="position:relative">
+        <div class="dpdfpagediv">
+            <canvas id="the-canvas"/>
+        </div>
+        <div class="roving">###</div>
+        <div class="rhpanel">
+            <input type="text" id="extracttexti"/>
+            <input type="button" id="extracttext" value="Extract text"/> 
+            <input type="button" id="loadissues" value="Load issues"/> 
+            <ul id="issueslist">
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
