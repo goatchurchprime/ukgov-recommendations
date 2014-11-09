@@ -2,7 +2,7 @@
 
 Quality assurance by issue tracking inspired by [Francis's Github House](http://www.wired.com/2013/01/this-old-house/)
 
-1.  The [Commons Public Accounts Committee](http://www.parliament.uk/business/committees/committees-a-z/commons-select/public-accounts-committee/publications/) has produced 21 reports in this 2014-2015 session alone.  These reports in PDF form contain ??? recommendations.
+1.  The [Commons Public Accounts Committee](http://www.parliament.uk/business/committees/committees-a-z/commons-select/public-accounts-committee/publications/) has published 20 reports in this 2014-2015 session alone.  These reports (in PDF form) contain 113 Recommendations.
 
 2.  (Unfortunately the Briefings paper dataset on http://www.data.parliament.uk/ doesn't link to these.  [NAO reports](http://www.nao.org.uk/search/type/report/) do contain recommendations, but they are too wishy-washy in the context of a database) .
 
