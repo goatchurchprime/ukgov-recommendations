@@ -12,6 +12,7 @@
 .dpdfpagediv { border: thin black solid; display: inline-block }
 .rhpanel {float: right; padding-left: auto }
 .roving { position: absolute; left: 0px; top: 0px; background-color: yellow }
+#extractedtext { width: 270px; height: 250px }
 
 </style>
 <script>
@@ -30,11 +31,27 @@ var setcropv = null;
 
 
 
-// these conversions from the transform matrix in the textcontentobj item to the cropping coordinates have been found experimentally (note that y is upside down)
+// these conversions from the transform matrix in the textcontentobj item to the cropping coordinates 
+// have been found experimentally (note that y is upside down)
+// (this is not ideal) 
 // 113.46, 746.46 -> 169,  129
 // 458.46, 94.92  -> 686, 1109
 function convx(x) { return (x - 113.46) / (458.46 - 113.46) * (686 - 169) + 169; }
-function convy(y) { return (y - 746.46) / (94.92 - 746.46) * (1109 - 129) + 129; }
+function convy(y) { return (y - (746.46 + 12)) / (94.92 - 746.46) * (1109 - 129) + 129; }
+function convitempos(item) {
+    var trm = item.transform;  // [a b c d tx ty]
+    var cx = convx(trm[4]); 
+    var cy = convy(trm[5]); 
+    var cx1 = convx(trm[4] + item.width); 
+    var cy1 = convy(trm[5] + item.height); 
+    //console.log([cx, cy-item.height, cx1, cy]); 
+    return [cx, cy-item.height, cx1, cy];  // unmapped height in cy1 seems to scale better
+}
+function checkoverlap(v) {
+    return ((v[2] > setcropv.x) && (v[0] < setcropv.x2) && (v[3] > setcropv.y) && (v[1] < setcropv.y2)); 
+}
+
+
 
 function setCrop(c)
 {
@@ -91,6 +108,7 @@ function pdfmakepagefunc(lnpage) {
     else
         $("#nextpage").hide(); 
     pagehref = "?f="+encodeURIComponent(urlParams.f)+"&p="+encodeURIComponent(npage); 
+    $("#deeplink").val("[doc:"+urlParams.f+", page:"+npage+"](http://localhost:9003/html/pdfviewer.html"+pagehref+")"); 
 }
         
 function pdfdocumentfunc(lfpdf, lnpage)
@@ -130,19 +148,33 @@ $(window).ready(function()
         }}); 
     });
     
-    $("#extracttext").click(function() { 
-        var i = parseInt($("#extracttexti").val()); 
+    $("#fetchtextitem").click(function() { 
+        var i = parseInt($("#fetchtextitemi").val()); 
         var item = textcontentobj.items[i]; 
         console.log(item); 
-        var trm = item.transform;  // [a b c d tx ty]
-        var height = 1000; //$('#the-canvas').attr('height'); 
-        var cx = convx(trm[4]); 
-        var cy = convy(trm[5]); 
-        var cx1 = convx(trm[4] + item.width); 
-        var cy1 = convy(trm[5] - item.height); 
-        jcropperapi.animateTo([cx, cy, cx1, cy1]); 
+        jcropperapi.animateTo(convitempos(item)); 
         //$(".roving").css("top", cy).css("left", cx).text(item.str+"#"); 
     }); 
+    
+    $("#cleartext").click(function() { $("#extractedtext").val(""); }); 
+    $("#extracttext").click(function() { 
+        var tsects = [ ]; 
+        for (var i = 0; i < textcontentobj.items.length; i++) {
+            var v = convitempos(textcontentobj.items[i]); 
+            if (checkoverlap(v)) {
+                tsects.push([v[3], v[0], textcontentobj.items[i].str]); 
+            }
+        }
+        tsects.sort(); 
+        var extractedtextlist = [$("#extractedtext").val()]; 
+        for (var i = 0; i < tsects.length; i++) {
+            extractedtextlist.push(tsects[i][2]); 
+        }
+        extractedtextlist.push("\n\n"); 
+        $("#extractedtext").val(extractedtextlist.join("")); 
+        console.log(tsects); 
+        console.log("text extracted"); 
+    });    
 }); 
 
 
@@ -170,11 +202,17 @@ $(window).ready(function()
         </div>
         <div class="roving">###</div>
         <div class="rhpanel">
-            <input type="text" id="extracttexti"/>
+            <input type="text" id="fetchtextitemi"/>
+            <input type="button" id="fetchtextitem" value="Fetch text item"/> 
+            <br/>
             <input type="button" id="extracttext" value="Extract text"/> 
-            <input type="button" id="loadissues" value="Load issues"/> 
+            <input type="button" id="cleartext" value="Clear"/> 
+            <br/>
+            <textarea id="extractedtext"></textarea> 
             <ul id="issueslist">
             </ul>
+            <input type="text" id="deeplink" value=""/> 
+            <input type="button" id="addissue" value="Add issue"/> 
         </div>
     </div>
 </body>
